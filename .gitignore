@@ -1,0 +1,23 @@
+# ============ 密钥与本地配置（严禁提交）============
+# 真实视觉 API 配置（含 API Key），GitHub 只保留 vision_config.env.example
+skill/config/vision_config.env
+
+# Claude Code 本地个人设置（可能包含模型配置与密钥）
+.claude/settings.local.json
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ============ 测试与覆盖率 ============
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ============ 系统文件 ============
+.DS_Store
+Thumbs.db
+desktop.ini
