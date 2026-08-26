@@ -131,5 +131,29 @@ class TestMainExitCodes(unittest.TestCase):
         self.assertEqual(buf.getvalue().strip(), "纯净结果")
 
 
+class TestIsolatedInterpreter(unittest.TestCase):
+    """回归测试：便携运行时（embeddable）以隔离模式运行，不把脚本目录加入 sys.path。
+    用系统 python 的 -I 参数模拟隔离模式，验证入口脚本自带路径引导、模块互引正常。"""
+
+    def test_entry_scripts_work_under_isolated_mode(self):
+        import subprocess
+        src = vision.SKILL_DIR / "src"
+        # vision.py：应走到配置检查（项目 env Key 为空 → 配置错误），而不是模块导入崩溃
+        proc1 = subprocess.run(
+            [sys.executable, "-I", str(src / "vision.py"), "missing.png"],
+            capture_output=True, timeout=60,
+        )
+        err1 = proc1.stderr.decode("utf-8", errors="replace")
+        self.assertNotIn("ModuleNotFoundError", err1)
+        self.assertNotIn("Traceback", err1)
+        self.assertIn("配置错误", err1)
+        # attachment.py：清理模式应正常执行
+        proc2 = subprocess.run(
+            [sys.executable, "-I", str(src / "attachment.py"), "--cleanup"],
+            capture_output=True, timeout=60,
+        )
+        self.assertEqual(proc2.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

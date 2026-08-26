@@ -43,12 +43,15 @@ user-invocable: true
 2. 运行脚本（在任意目录运行均可，脚本会自动定位自己的配置文件）：
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/src/vision.py" "<图片1路径>" ["<图片2路径>" ...] -q "<用户问题原文>"
+bash "${CLAUDE_SKILL_DIR}/bin/vision" "<图片1路径>" ["<图片2路径>" ...] -q "<用户问题原文>"
 ```
 
-- Windows 上使用 `python`（不要用 `python3`）。
+- 启动器会自动优先使用 Skill 自带的便携 Python 运行时（`runtime/`，已含 Pillow，
+  用户无需安装 Python）；runtime 目录不存在时自动退回系统 `python`。
 - 路径含空格或中文时保留引号；问题文本保持用户原文，不要改写。
 - 多张图片一次传入（官方单请求最多 600 张）。
+- 超限图片（单张 >32MiB、单边 >8192px 或多图合计超出请求体预算）会自动缩放/压缩为
+  临时副本后发送，**用户原始图片绝不会被改动**；无需手动提示用户压缩。
 - 视觉模型的回答打印在 stdout；stderr 只用于进度和错误信息。
 
 3. 读取 stdout 作为视觉分析结果，**基于它继续推理并给出最终回答**。
@@ -66,7 +69,7 @@ python "${CLAUDE_SKILL_DIR}/src/vision.py" "<图片1路径>" ["<图片2路径>" 
 1. 提取附件为临时图片（只读取当前会话存档，只提取图片字节，不读取聊天内容）：
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/src/attachment.py" "${CLAUDE_SESSION_ID}"
+bash "${CLAUDE_SKILL_DIR}/bin/attachment" "${CLAUDE_SESSION_ID}"
 ```
 
 - 成功：stdout 输出临时图片路径（多张则每行一个），退出码 0。
@@ -76,13 +79,13 @@ python "${CLAUDE_SKILL_DIR}/src/attachment.py" "${CLAUDE_SESSION_ID}"
 2. 把临时路径当作普通图片路径，与用户问题原文一起调用视觉模型（规则与上面完全一致）：
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/src/vision.py" "<临时路径1>" ["<临时路径2>" ...] -q "<用户问题原文>"
+bash "${CLAUDE_SKILL_DIR}/bin/vision" "<临时路径1>" ["<临时路径2>" ...] -q "<用户问题原文>"
 ```
 
 3. 视觉分析完成后清理临时图片：
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/src/attachment.py" --cleanup "<临时路径1>" ["<临时路径2>" ...]
+bash "${CLAUDE_SKILL_DIR}/bin/attachment" --cleanup "<临时路径1>" ["<临时路径2>" ...]
 ```
 
 注意：
@@ -97,7 +100,7 @@ vision.py：
 |---|---|---|
 | 0 | 成功 | stdout 即视觉分析结果 |
 | 1 | 配置错误（Key 未填 / 配置文件缺失） | 提示用户用 VS Code 打开 `config/vision_config.env` 填写 `VISION_API_KEY` |
-| 2 | 图片错误（不存在 / 格式不支持 / 超过 32MiB） | 把 stderr 的具体原因转达用户；支持 PNG / JPEG / GIF / WEBP |
+| 2 | 图片错误（不存在 / 格式不支持 / 自动处理后仍超限） | 把 stderr 的具体原因转达用户；支持 PNG / JPEG / GIF / WEBP |
 | 3 | API 错误（网络 / 超时 / 官方错误码） | 把 stderr 中的官方错误信息转达用户，必要时提示检查 `VISION_API_BASE_URL`、余额或稍后重试 |
 
 attachment.py（附件提取）：

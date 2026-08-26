@@ -45,19 +45,29 @@ vision/
 ├── .gitignore                       ← 忽略真实配置与本地文件
 ├── skill/                           ← ★ 真正安装到 Claude Code 的内容
 │   ├── SKILL.md                     ← Skill 入口（触发条件 + 使用说明）
+│   ├── bin/
+│   │   ├── vision                   ← 启动器：自动使用内置运行时或系统 python
+│   │   └── attachment               ← 附件提取启动器（同上）
+│   ├── runtime/                     ← ★ 内置便携 Python 3.13 + Pillow（Windows），
+│   │                                  用户无需安装 Python 即可使用
 │   ├── config/
 │   │   ├── vision_config.env.example ← 配置模板（GitHub 保留，无真实 Key）
 │   │   └── vision_config.env         ← 真实配置（本地文件，你自己填写，不上传）
 │   └── src/
 │       ├── vision.py                ← 命令行入口：读配置、校验图片、打印结果
 │       ├── api_client.py            ← DeepSeek Vision API 客户端（纯标准库）
-│       └── attachment.py            ← 附件适配层：从会话存档提取 VS Code 上传的图片
+│       ├── attachment.py            ← 附件适配层：从会话存档提取 VS Code 上传的图片
+│       └── preprocess.py            ← 大图片自动缩放/压缩（超限才处理，原图不改动）
 └── tests/                           ← 单元测试（无需真实 API Key）
 ```
 
 ## 安装
 
 **只需要安装 `skill/` 目录**（README、LICENSE、tests 不需要复制）。
+
+**无需安装 Python**：`skill/runtime/` 内置便携 Python 3.13 + Pillow（Windows 版），
+`bin/` 启动器会自动优先使用它，与系统 Python、项目虚拟环境完全隔离，互不影响。
+（macOS / Linux 使用系统 `python3`；未装 Pillow 时仅"大图片自动处理"不可用，其余功能正常。）
 
 1. 把仓库里的 `skill/` 文件夹复制到 Claude Code 全局 Skill 目录：
 
@@ -90,12 +100,18 @@ C:\Users\<你的用户名>\.claude\
 └── skills\
     └── image-vision\
         ├── SKILL.md
+        ├── bin\
+        │   ├── vision
+        │   └── attachment
+        ├── runtime\                ← 内置 Python + Pillow（Windows）
         ├── config\
         │   ├── vision_config.env.example
         │   └── vision_config.env
         └── src\
             ├── vision.py
-            └── api_client.py
+            ├── api_client.py
+            ├── attachment.py
+            └── preprocess.py
 ```
 
 ## 配置
@@ -204,7 +220,9 @@ A：多为图片过大（单张 > 32MiB、单边 > 8192px）或格式不符，�
 A：在配置文件中调大 `VISION_TIMEOUT_SECONDS`。
 
 **Q：需要安装 Python 依赖吗？**
-A：不需要。脚本只使用 Python 标准库，零第三方依赖；需要 Python 3.8+。
+A：**不需要（Windows）**。Skill 内置便携 Python 3.13 + Pillow（`skill/runtime/`），
+clone 仓库即可运行，与系统 Python / 项目虚拟环境完全隔离。
+macOS / Linux 使用系统 `python3`（脚本本身是标准库零依赖；未装 Pillow 时仅大图自动处理不可用）。
 
 **Q：配置文件在哪里？**
 A：唯一位置 `skill/config/vision_config.env`，不用翻源代码。

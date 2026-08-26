@@ -25,6 +25,12 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
+# 便携运行时（python.org embeddable，隔离模式）不会把脚本所在目录加入 sys.path，
+# 这里手动补上，保证 skill/src 内的模块互引在任何运行方式下都可用
+_SRC_DIR = str(Path(__file__).resolve().parent)
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
 from api_client import (
     MAX_IMAGE_BYTES,
     VisionAPIError,
@@ -32,6 +38,7 @@ from api_client import (
     VisionImageError,
     call_vision_api,
 )
+from preprocess import cleanup_temp_files, prepare_images
 
 # Skill 根目录（src/ 的上一级），配置文件固定在其 config/ 子目录下，
 # 不依赖 Skill 被安装在哪个位置
@@ -147,11 +154,23 @@ def main(argv=None) -> int:
         images, question = split_question(ns)
         config = load_config()
         validate_image_paths(images)
-        print(
-            f"[vision] 正在调用 {config['model']} 分析 {len(images)} 张图片...",
-            file=sys.stderr,
-        )
-        result = call_vision_api(config, images, question)
+        # 大图片自动处理：超限图片生成临时缩放/压缩副本，原图只读、绝不修改
+        prepared, temp_files = prepare_images(images)
+        try:
+            if temp_files:
+                print(
+                    f"[vision] 有 {len(temp_files)} 张图片超过限制，"
+                    "已自动缩放/压缩生成临时副本（原图未改动）",
+                    file=sys.stderr,
+                )
+            print(
+                f"[vision] 正在调用 {config['model']} 分析 {len(prepared)} 张图片...",
+                file=sys.stderr,
+            )
+            result = call_vision_api(config, prepared, question)
+        finally:
+            # 分析完成后清理临时副本
+            cleanup_temp_files(temp_files)
         print(result)
         return 0
     except VisionConfigError as e:

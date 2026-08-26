@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# Image Vision Skill 启动器（vision.py）
+# 优先使用 Skill 自带的便携 Python 运行时（skill/runtime/，含 Pillow），
+# 用户无需安装 Python；runtime 目录不存在时自动退回系统 python。
+DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+if [ -x "$DIR/runtime/python.exe" ]; then
+  exec "$DIR/runtime/python.exe" "$DIR/src/vision.py" "$@"
+elif command -v python >/dev/null 2>&1; then
+  exec python "$DIR/src/vision.py" "$@"
+elif command -v python3 >/dev/null 2>&1; then
+  exec python3 "$DIR/src/vision.py" "$@"
+else
+  echo "[vision] 未找到可用的 Python：runtime 目录不存在，且系统未安装 Python" >&2
+  exit 1
+fi

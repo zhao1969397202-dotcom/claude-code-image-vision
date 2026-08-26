@@ -40,7 +40,12 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-# api_client.py 与本文件同目录，直接运行本脚本时同目录会自动加入 sys.path
+# 便携运行时（python.org embeddable，隔离模式）不会把脚本所在目录加入 sys.path，
+# 这里手动补上，保证 skill/src 内的模块互引在任何运行方式下都可用
+_SRC_DIR = str(Path(__file__).resolve().parent)
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
+
 from api_client import detect_image_format
 
 HOME_CLAUDE = Path.home() / ".claude"
