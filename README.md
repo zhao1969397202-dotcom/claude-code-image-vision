@@ -63,11 +63,16 @@ vision/
 
 ## 安装
 
-**只需要安装 `skill/` 目录**（README、LICENSE、tests 不需要复制）。
+**本 Skill 当前仅支持 Windows。**
 
-**无需安装 Python**：`skill/runtime/` 内置便携 Python 3.13 + Pillow（Windows 版），
-`bin/` 启动器会自动优先使用它，与系统 Python、项目虚拟环境完全隔离，互不影响。
-（macOS / Linux 使用系统 `python3`；未装 Pillow 时仅"大图片自动处理"不可用，其余功能正常。）
+- Windows 用户**无需安装 Python**：`skill/runtime/` 内置便携 Python 3.13 + Pillow；
+- `bin/vision` 和 `bin/attachment` 会优先调用 Skill 自带的 Windows runtime；
+- 不依赖用户电脑上的系统 Python，也不依赖项目虚拟环境；
+- Pillow 已随 runtime 一起提供，大图片自动处理功能可以直接使用；
+- 用户只需要配置自己的 DeepSeek Vision API Key；
+- 只需要安装 `skill/` 目录，不需要复制 README.md、LICENSE、tests 等文件。
+
+> 当前版本的便携运行时为 Windows 版本，因此本项目当前定位为 Windows 专用。
 
 1. 把仓库里的 `skill/` 文件夹复制到 Claude Code 全局 Skill 目录：
 
@@ -79,12 +84,6 @@ vision/
 
    ```powershell
    Copy-Item -Recurse -Force <仓库路径>\skill "$env:USERPROFILE\.claude\skills\image-vision"
-   ```
-
-   macOS / Linux：
-
-   ```bash
-   cp -r <仓库路径>/skill ~/.claude/skills/image-vision
    ```
 
 2. 配置视觉模型（见下一节，**必须填写 API Key**）。
@@ -220,9 +219,8 @@ A：多为图片过大（单张 > 32MiB、单边 > 8192px）或格式不符，�
 A：在配置文件中调大 `VISION_TIMEOUT_SECONDS`。
 
 **Q：需要安装 Python 依赖吗？**
-A：**不需要（Windows）**。Skill 内置便携 Python 3.13 + Pillow（`skill/runtime/`），
-clone 仓库即可运行，与系统 Python / 项目虚拟环境完全隔离。
-macOS / Linux 使用系统 `python3`（脚本本身是标准库零依赖；未装 Pillow 时仅大图自动处理不可用）。
+A：**不需要**。Skill 内置便携 Python 3.13 + Pillow（`skill/runtime/`，Windows 版），
+clone 仓库即可在 Windows 上运行，与系统 Python / 项目虚拟环境完全隔离。
 
 **Q：配置文件在哪里？**
 A：唯一位置 `skill/config/vision_config.env`，不用翻源代码。
