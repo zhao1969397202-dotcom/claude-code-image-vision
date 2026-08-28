@@ -15,7 +15,7 @@ from unittest import mock
 SRC = Path(__file__).resolve().parent.parent / "skill" / "src"
 sys.path.insert(0, str(SRC))
 
-from api_client import VisionAPIError, VisionImageError  # noqa: E402
+from api_client import MAX_IMAGE_BYTES, VisionAPIError, VisionImageError  # noqa: E402
 import vision  # noqa: E402
 import testdata  # noqa: E402
 
@@ -77,12 +77,20 @@ class TestValidateImagePaths(unittest.TestCase):
         with self.assertRaises(VisionImageError):
             vision.validate_image_paths([str(self.tmp / "nope.png")])
 
-    def test_over_32mib_raises(self):
+    def test_over_32mib_file_passes_validate(self):
+        # 大小超限不再由 validate 拦截，交给 prepare_images 自动处理
         big = self.tmp / "big.png"
-        with open(big, "wb") as f:
-            f.truncate(vision.MAX_IMAGE_BYTES + 1)
+        big.write_bytes(testdata.PNG_BYTES)
+        with open(big, "ab") as f:
+            f.truncate(MAX_IMAGE_BYTES + 1)
+        self.assertGreater(big.stat().st_size, MAX_IMAGE_BYTES)
+        vision.validate_image_paths([str(big)])  # 不应抛异常
+
+    def test_unsupported_format_raises(self):
+        bad = self.tmp / "fake.png"  # 扩展名是 .png，内容是文本
+        bad.write_bytes(testdata.TEXT_BYTES)
         with self.assertRaises(VisionImageError):
-            vision.validate_image_paths([str(big)])
+            vision.validate_image_paths([str(bad)])
 
     def test_valid_path_passes(self):
         vision.validate_image_paths([str(self.png)])

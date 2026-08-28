@@ -12,14 +12,13 @@
     - 错误信息走 stderr，退出码：
         0 成功
         1 配置错误（配置文件缺失 / API Key 未填写）
-        2 图片错误（不存在 / 格式不支持 / 超过大小限制）
+        2 图片错误（不存在 / 格式不支持 / 自动处理后仍超限）
         3 API 错误（网络失败 / 超时 / 官方返回错误）
 
 零第三方依赖：配置文件解析只用 Python 标准库（不使用 python-dotenv）。
 """
 
 import argparse
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -32,11 +31,11 @@ if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
 from api_client import (
-    MAX_IMAGE_BYTES,
     VisionAPIError,
     VisionConfigError,
     VisionImageError,
     call_vision_api,
+    detect_image_format,
 )
 from preprocess import cleanup_temp_files, prepare_images
 
@@ -131,15 +130,23 @@ def split_question(ns: argparse.Namespace) -> tuple:
 
 
 def validate_image_paths(paths: list) -> None:
+    """基础校验：路径存在、是文件、格式受支持。
+
+    大小与像素限制不在这里拦截——统一交给 prepare_images() 处理，
+    超限图片会自动生成临时副本，而不是直接报错。
+    """
     for path in paths:
         if not Path(path).is_file():
             raise VisionImageError(f"图片文件不存在：{path}")
-        size = os.path.getsize(path)
-        if size > MAX_IMAGE_BYTES:
-            raise VisionImageError(
-                f"图片超过 {MAX_IMAGE_BYTES // (1024 * 1024)}MiB 上限：{path}"
-                f"（{size / (1024 * 1024):.1f}MiB）"
-            )
+        try:
+            with open(path, "rb") as f:
+                head = f.read(32)  # 格式魔数只需要前几个字节
+        except OSError as e:
+            raise VisionImageError(f"无法读取图片文件：{path}（{e}）") from e
+        try:
+            detect_image_format(head)
+        except ValueError as e:
+            raise VisionImageError(f"图片格式不支持：{path}（{e}）") from e
 
 
 def main(argv=None) -> int:

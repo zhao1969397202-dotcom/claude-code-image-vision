@@ -256,6 +256,34 @@ class TestVisionMainIntegration(PreprocessFixture):
         self.assertFalse(Path(captured["paths"][0]).exists())      # 调用后被清理
         self.assertEqual(len(list(pp.TEMP_ROOT.glob("pre_*"))), 0)  # 无残留
 
+    def test_main_flow_auto_processes_oversized_file(self):
+        # 大小超限的文件走完整 main 流程：validate 放行 → prepare 生成副本 → 用后清理
+        self._temp_config()
+        old_limit = pp.MAX_IMAGE_BYTES
+        pp.MAX_IMAGE_BYTES = 20_000  # 用更低阈值模拟"超限"，走同一判定逻辑
+        try:
+            p = self.write_noise_png("big.png", 120, 120)
+            self.assertGreater(p.stat().st_size, pp.MAX_IMAGE_BYTES)
+            orig_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+            captured = {}
+
+            def fake_call(config, image_paths, question):
+                captured["paths"] = list(image_paths)
+                captured["during"] = [Path(x).exists() for x in image_paths]
+                return "结果"
+
+            with mock.patch.object(vision, "call_vision_api", fake_call), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                code = vision.main([str(p), "-q", "问题"])
+            self.assertEqual(code, 0)
+            used = captured["paths"][0]
+            self.assertNotEqual(used, str(p))                # 发送的是副本，不是原图
+            self.assertTrue(all(captured["during"]))         # 调用期间副本存在
+            self.assertFalse(Path(used).exists())            # API 结束后已清理
+            self.assertEqual(hashlib.sha256(p.read_bytes()).hexdigest(), orig_hash)  # 原图未动
+        finally:
+            pp.MAX_IMAGE_BYTES = old_limit
+
     def test_no_api_key_leak_in_output(self):
         _, key = self._temp_config(key="sk-LEAKTEST-0123456789abcdef")
         p = self.write_png("wide.png", 8200, 200)
