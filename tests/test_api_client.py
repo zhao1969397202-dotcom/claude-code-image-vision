@@ -19,10 +19,12 @@ sys.path.insert(0, str(SRC))
 import api_client as ac  # noqa: E402
 import testdata  # noqa: E402
 
+# 模型名只是配置值，api_client 不解释它、只负责放进请求体，
+# 所以测试用当前默认模型名，换模型时跟着配置一起改即可
 VALID_CONFIG = {
     "api_key": "sk-local-test",
     "base_url": "https://api.deepseek.com",
-    "model": "deepseek-v4-flash-vision-exp",
+    "model": "deepseek-flash",
     "detail": "auto",
     "timeout_seconds": 120,
 }
@@ -87,9 +89,9 @@ class TestBuildRequestBody(unittest.TestCase):
 
     def test_official_structure_with_question(self):
         body = ac.build_request_body(
-            "deepseek-v4-flash-vision-exp", [str(self.png)], "这是什么？", "auto"
+            "deepseek-flash", [str(self.png)], "这是什么？", "auto"
         )
-        self.assertEqual(body["model"], "deepseek-v4-flash-vision-exp")
+        self.assertEqual(body["model"], "deepseek-flash")
         msg = body["messages"][0]
         self.assertEqual(msg["role"], "user")
         self.assertEqual(len(body["messages"]), 1)
@@ -157,7 +159,7 @@ class TestCallVisionAPI(unittest.TestCase):
         self.assertEqual(req.headers["Authorization"], "Bearer sk-local-test")
         self.assertEqual(req.headers["Content-type"], "application/json")
         body = json.loads(req.data.decode("utf-8"))
-        self.assertEqual(body["model"], "deepseek-v4-flash-vision-exp")
+        self.assertEqual(body["model"], "deepseek-flash")
         self.assertEqual(body["messages"][0]["role"], "user")
 
     def test_http_401_parses_official_error_and_hints_key(self):

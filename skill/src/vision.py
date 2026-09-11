@@ -5,7 +5,7 @@
 
 流程：
     vision_config.env -> 读取配置 -> 校验图片 -> 调用 api_client
-    -> deepseek-v4-flash-vision-exp -> 打印分析结果到 stdout
+    -> DeepSeek V4.1-Flash（deepseek-flash）-> 打印分析结果到 stdout
 
 约定：
     - stdout 只打印视觉模型的回答原文（供主模型读取后继续推理）
@@ -96,7 +96,7 @@ def _finalize_config(values: dict, config_path: Path) -> dict:
     return {
         "api_key": api_key,
         "base_url": values.get("VISION_API_BASE_URL", "https://api.deepseek.com").strip(),
-        "model": values.get("VISION_MODEL", "deepseek-v4-flash-vision-exp").strip(),
+        "model": values.get("VISION_MODEL", "deepseek-flash").strip(),
         "detail": values.get("VISION_IMAGE_DETAIL", "auto").strip(),
         "timeout_seconds": max(1, timeout),
     }

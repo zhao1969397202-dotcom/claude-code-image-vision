@@ -41,7 +41,7 @@ class TestConfigParsing(unittest.TestCase):
     def test_defaults_applied(self):
         self.write("VISION_API_KEY=sk-test\n")
         c = vision.load_config(self.cfg)
-        self.assertEqual(c["model"], "deepseek-v4-flash-vision-exp")
+        self.assertEqual(c["model"], "deepseek-flash")
         self.assertEqual(c["base_url"], "https://api.deepseek.com")
         self.assertEqual(c["detail"], "auto")
         self.assertEqual(c["timeout_seconds"], 120)

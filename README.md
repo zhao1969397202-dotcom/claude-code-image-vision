@@ -1,46 +1,67 @@
-# Image Vision Skill
+# Claude Code Image Vision Skill
 
-给 Claude Code 装上"眼睛"：基于 DeepSeek 官方视觉模型 **`deepseek-v4-flash-vision-exp`** 的全局图片理解 Skill。
+一个供 Claude Code 调用的 Image Vision Skill：当 Claude Code 当前使用的主模型本身不具备图像理解能力时，
+由本 Skill 把图片交给 **DeepSeek V4.1-Flash**（API 模型名 `deepseek-flash`）完成视觉分析，
+再把结果交还给主模型继续推理。
 
 **Windows 专用 · 无需安装 Python · 支持 VS Code "+" 图片附件 · 支持大图片自动处理**
 
-主模型（如 DeepSeek-V4-Pro）负责理解任务、规划与推理，但主模型本身不具备视觉能力。
-本 Skill 在需要"看图"时，把**图片 + 用户问题原文**一起交给 DeepSeek 视觉模型分析，
-再将文字分析结果交回主模型继续推理，给出最终回答。
+## 这个项目解决什么问题
 
-**主模型配置完全不需要改动**，视觉模型只充当主模型的"眼睛"。
+我用 Claude Code 时，主模型是纯文本模型：它能规划任务、写代码、做推理，但**看不了图**。
+发一张报错截图过去，它只能看到一个占位符，没法告诉我截图里写了什么。
 
-## Windows 定位
+所以我做了这个 Skill：把"看图"这件事交给一个专门的多模态模型，主模型继续做它擅长的事。
+**主模型配置不需要任何改动**，视觉模型只是主模型的"眼睛"，不替代主模型。
 
-- 当前版本**仅支持 Windows**；
-- `skill/runtime/` 内置便携 Python 3.13 + Pillow（Windows 版本），
-  用户**无需额外安装 Python**；
-- `bin/vision` 和 `bin/attachment` 会**优先使用 Skill 自带的 runtime**，
-  不依赖用户电脑上的系统 Python，也不依赖项目虚拟环境；
-- Pillow 已随 runtime 一起提供，大图片自动处理功能开箱即用；
-- 用户只需要配置自己的 DeepSeek Vision API Key。
+## 项目定位：谁负责什么
+
+| 角色 | 负责的事情 |
+|---|---|
+| Claude Code 主模型 | 理解用户意图、任务规划、判断何时需要图像理解、调用 Skill、结合视觉结果继续推理、给出最终回答 |
+| DeepSeek V4.1-Flash（`deepseek-flash`） | 图像理解、OCR、截图分析、图表/表格/流程图读取 |
+| Image Vision Skill（本项目） | 两者之间的连接与执行层：组织图片与问题、发起视觉请求、把结果交回主模型 |
+
+需要强调的是：**这不是一个可以脱离 Claude Code 独立运行的图片识别工具**，
+而是 Claude Code 使用的一个 Skill。它也不是"让 Claude Code 获得原生视觉能力"——
+主模型本身依旧没有视觉能力，只是通过调用外部视觉模型补上了看图这一环。
 
 ## 工作原理
 
 ```text
-用户提问 + 本地图片（本地文件 / 项目内文件 / 截图等 Claude Code 能访问到的本地图片文件）
+用户提供图片 + 问题
         ↓
-主模型（DeepSeek-V4-Pro）判断需要视觉能力
+Claude Code
         ↓
-自动调用本 Skill（或用户手动输入 /image-vision）
+Claude Code 当前使用的主模型
+（可能本身没有视觉能力）
         ↓
-bin/vision 启动器（优先使用 Skill 自带的便携 Python runtime）运行 vision.py
+判断需要图像理解
         ↓
-读取 config/vision_config.env → 自动检查并预处理超限图片
+调用 Image Vision Skill
         ↓
-图片 base64 编码 + 用户问题原文，一起发送给视觉模型
+vision.py            ← 流程控制：参数、配置、校验、调用、清理
         ↓
-deepseek-v4-flash-vision-exp 返回文字分析结果
+preprocess.py        ← 图片尺寸/大小/编码预处理（只处理超限图片）
         ↓
-主模型基于视觉结果继续推理
+api_client.py        ← 组装并发起 DeepSeek API 请求
+        ↓
+DeepSeek V4.1-Flash
+(deepseek-flash)
+        ↓
+图像理解 / OCR / 截图分析
+        ↓
+视觉结果返回
+        ↓
+Claude Code 主模型
+        ↓
+结合视觉结果继续推理
         ↓
 最终回答用户
 ```
+
+如果图片是 VS Code 侧边栏 "+" 上传的附件（没有文件路径），
+主模型会在调用 `vision.py` 之前先经过 `attachment.py` 提取图片，见下文"VS Code '+' 上传的图片附件"。
 
 ## 能力清单
 
@@ -50,8 +71,18 @@ deepseek-v4-flash-vision-exp 返回文字分析结果
 - 网页截图 / UI 截图分析
 - 数学题截图分析
 - 图表、表格、流程图分析
-- 根据图片回答问题（图片 + 问题一起发送给视觉模型，针对问题分析）
+- 根据图片回答问题（图片 + 用户问题一起发送给视觉模型，针对问题分析）
 - 大图片自动缩放/压缩（超限才处理，原图绝不改动）
+
+## Windows 定位
+
+- 当前版本**仅支持 Windows**；
+- `skill/runtime/` 内置便携 Python 3.13 + Pillow（Windows 版本），
+  使用者**无需额外安装 Python**；
+- `bin/vision` 和 `bin/attachment` 会**优先使用 Skill 自带的 runtime**，
+  不依赖使用者电脑上的系统 Python，也不依赖项目虚拟环境；
+- Pillow 已随 runtime 一起提供，大图片自动处理功能开箱即用；
+- 使用者只需要配置自己的 DeepSeek API Key。
 
 ## 目录结构
 
@@ -68,10 +99,10 @@ vision/
 │   ├── runtime/                     ← ★ 内置便携 Python 3.13 + Pillow（Windows）
 │   ├── config/
 │   │   ├── vision_config.env.example ← 配置模板（GitHub 保留，无真实 Key）
-│   │   └── vision_config.env         ← 真实配置（本地文件，你自己填写，不上传）
+│   │   └── vision_config.env         ← 真实配置（本地文件，自己填写，不上传）
 │   └── src/
 │       ├── vision.py                ← 命令行入口：读配置、校验与预处理图片、打印结果
-│       ├── api_client.py            ← DeepSeek Vision API 客户端（纯标准库）
+│       ├── api_client.py            ← DeepSeek API 客户端（纯标准库）
 │       ├── attachment.py            ← 附件适配层：从会话存档提取 VS Code 上传的图片
 │       └── preprocess.py            ← 大图片自动缩放/压缩（超限才处理，原图不改动）
 └── tests/                           ← 单元测试（无需真实 API Key）
@@ -136,7 +167,7 @@ skill/config/vision_config.env
 |---|---|---|
 | `VISION_API_KEY` | ✅ 必填 | 你的 DeepSeek API Key，获取地址：https://platform.deepseek.com/api_keys |
 | `VISION_API_BASE_URL` | 可选 | API 地址，默认 `https://api.deepseek.com`，一般不用改 |
-| `VISION_MODEL` | 可选 | 视觉模型名称，默认 `deepseek-v4-flash-vision-exp` |
+| `VISION_MODEL` | 可选 | 视觉模型名称，默认 `deepseek-flash`（DeepSeek V4.1-Flash） |
 | `VISION_IMAGE_DETAIL` | 可选 | 图片精度（官方 detail 参数）：`auto`（默认，推荐）/ `low`（最快最省 token）/ `high` / `original`。代码**原样传递给官方 API**，不做本地校验 |
 | `VISION_TIMEOUT_SECONDS` | 可选 | 单次请求超时秒数，默认 `120` |
 
@@ -196,7 +227,7 @@ Skill 通过文件路径读取本地图片，**不会去下载互联网上的图
 1. `attachment.py` 从**当前 Claude Code 会话存档**中提取附件里的图片数据
    （只提取图片字节，不读取聊天内容）；
 2. 图片临时保存到**系统临时目录**；
-3. 交给 `vision.py` 与 DeepSeek Vision 分析（图片与用户问题一起发送）；
+3. 交给 `vision.py` 与 DeepSeek V4.1-Flash 分析（图片与用户问题一起发送）；
 4. 分析完成后**临时文件自动清理**；
 5. 若附件提取失败，自动回退：请用户提供图片文件路径。
 
@@ -206,7 +237,7 @@ Skill 通过文件路径读取本地图片，**不会去下载互联网上的图
 
 ### 大图片自动处理
 
-Skill 在把图片发送给 DeepSeek Vision API **之前**，会自动检查每张图片的
+Skill 在把图片发送给 DeepSeek API **之前**，会自动检查每张图片的
 文件大小与像素尺寸：
 
 - **未超限**：直接使用原图，不做任何处理（不会无意义地降低质量）；
@@ -219,11 +250,11 @@ Skill 在把图片发送给 DeepSeek Vision API **之前**，会自动检查每�
 
 ### 更换视觉模型
 
-如果目标视觉模型**兼容当前 API 请求格式**，只需修改
+如果目标模型**兼容当前 API 请求格式**，只需修改
 `skill/config/vision_config.env` 中的一行：
 
 ```env
-VISION_MODEL=deepseek-v4-flash-vision-exp
+VISION_MODEL=deepseek-flash
 ```
 
 通常无需修改代码。换 API 地址改 `VISION_API_BASE_URL`，换 Key 改 `VISION_API_KEY`。
@@ -239,18 +270,41 @@ VISION_MODEL=deepseek-v4-flash-vision-exp
 
 格式按**文件实际内容**判断（不看文件名后缀）。
 
-## DeepSeek Vision 官方限制
+## 官方限制与本地工程策略
+
+这一节区分两类东西：**DeepSeek 官方文档规定的外部限制**，和**我自己在项目里定的工程策略**。
+
+### DeepSeek 官方限制
 
 本 Skill 使用官方支持的 **Base64 内联方式**传图（不使用 Files API）。
-适用限制如下：
+当前官方文档给出的限制如下：
 
-| 限制项 | 数值 | 本 Skill 的处理 |
+| 限制项 | 数值 |
+|---|---|
+| 单张图片文件大小（base64 / 外部 URL） | ≤ 32 MiB |
+| 请求体大小（base64 计入） | ≤ 48 MiB |
+| 单边像素尺寸 | ≤ 8192 px |
+| 同请求图片数 ≥ 15 张时单边 | ≤ 4096 px |
+| 单次请求图片数量 | ≤ 600 张 |
+| 单张图片计费 | 最多 384 tokens |
+| 支持的图片格式 | PNG / JPEG / GIF / WEBP（按内容判断） |
+| 图片位置 | 只能放在 `user` 消息中，放 system / assistant 消息会返回 400 |
+| `detail` 参数 | `low` / `high`（等同 `original`）/ `original` / `auto` |
+
+### 我在项目里定的工程策略
+
+下面这些**不是官方规定**，是我为了让请求稳定发出去而自己设定的：
+
+| 策略 | 取值 | 为什么这样定 |
 |---|---|---|
-| 单张图片文件大小 | ≤ 32 MiB | 发送前自动检查，超限自动压缩 |
-| 单边像素尺寸 | ≤ 8192 px | 发送前自动检查，超限自动缩放 |
-| 15 张及以上时单边 | ≤ 4096 px | 发送前自动检查，超限自动缩放 |
-| 单次请求图片数量 | ≤ 600 张 | 官方限制，由 API 侧校验 |
-| 单张图片计费 | 最多 384 tokens | 官方计费规则 |
+| 请求体安全预算 | 44 MiB | 官方上限 48 MiB，留出余量，避免 JSON 外壳和边界误差把请求顶过线 |
+| 超限图片优先输出格式 | PNG 无损 | 截图、OCR、代码截图、表格、图表的文字最怕压缩失真 |
+| PNG 仍超限时的兜底 | JPEG 质量 85 | 在体积和文字可读性之间取的折中值 |
+| 仍超限时的收缩步长 | 尺寸 × 0.85 | 逐步收缩，比一次性大幅缩小更能保住细节 |
+| 单张图最大尝试轮数 | 4 轮 | 避免极端图片导致长时间循环 |
+| 多图超预算时 | 优先压缩最大的那张 | 用最小的影响换回整体预算 |
+| 原图处理方式 | 只读，绝不修改 | 用户文件不能被这个 Skill 动过 |
+| 模块划分 | 流程 / 预处理 / API 客户端 / 附件提取分离 | 降低耦合，各部分可以独立测试 |
 
 ## 常见问题
 
@@ -286,11 +340,29 @@ A：能。Skill 会从当前会话存档中自动提取附件图片（`attachmen
 
 ## 安全说明
 
-- 真实配置文件 `vision_config.env` 包含 API Key，**必须由用户自己填写**，
+- 真实配置文件 `vision_config.env` 包含 API Key，**必须由使用者自己填写**，
   已被 `.gitignore` 忽略，**严禁提交到 GitHub**；
 - GitHub 仓库只保留 `vision_config.env.example` 模板（无真实 Key）；
 - 填写 Key 后请勿删除或修改 `.gitignore` 中的忽略规则；
 - 每次提交前请检查 `git status`，确认真实配置文件未被 Git 跟踪。
+
+## 模型迁移说明
+
+本 Skill 最初的视觉模型是 `deepseek-v4-flash-vision-exp`。
+DeepSeek 发布 V4.1-Flash 后，项目已迁移到当前模型：
+
+```text
+DeepSeek V4.1-Flash
+API model: deepseek-flash
+```
+
+旧名称 `deepseek-v4-flash-vision-exp` 已退役，虽然官方在一段时间内仍会把它
+路由到新模型，但项目不再依赖它。如果你是从旧版本升级，请把配置文件里的
+`VISION_MODEL` 改为 `deepseek-flash`（不改也能跑，但会走官方的兼容路由）。
+
+由于请求格式（Chat Completions、`image_url` + base64 data URL、`detail` 参数）
+和图片限制在迁移前后**保持不变**，代码侧只需要更新默认模型名，
+`preprocess.py` 与 `attachment.py` 的设计没有改动。
 
 ## 路线图
 

@@ -6,13 +6,15 @@
 https://api-docs.deepseek.com/guides/vision/
 
 - 接口：POST {VISION_API_BASE_URL}/chat/completions（OpenAI 兼容 Chat Completions）
-- 模型：deepseek-v4-flash-vision-exp（由配置文件 VISION_MODEL 指定）
+- 模型：由配置文件 VISION_MODEL 指定（当前 DeepSeek V4.1-Flash，API 名称 deepseek-flash）
+  本模块不写死模型名，换模型只改配置
 - 图片：base64 编码为 data URL，放入 user 消息的 image_url 块
   （官方规定图片只能出现在 user 消息中，system/assistant 消息放图片会返回 400）
 - 支持格式：PNG / JPEG / GIF / WEBP（按文件内容魔数判断，不看文件名）
-- 限制：单张图片 ≤ 32MiB（base64 / URL 方式）、请求体 ≤ 48MiB、
-  单边 ≤ 8192px、单请求 ≤ 600 张（大小与数量限制在本地校验，
-  像素尺寸与请求体限制由 API 返回错误时透传给用户）
+- 限制（官方）：单张图片 ≤ 32MiB（base64 / URL 方式）、请求体 ≤ 48MiB、
+  单边 ≤ 8192px、单请求 ≤ 600 张
+  本模块只负责单张 32MiB 的发送前校验；像素尺寸与请求体预算
+  由 preprocess.py 在发送前处理，不在这里拦截
 """
 
 import base64

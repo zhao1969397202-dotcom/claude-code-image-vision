@@ -1,6 +1,6 @@
 ---
 name: image-vision
-description: Analyze images using the DeepSeek vision model (deepseek-v4-flash-vision-exp).
+description: Analyze images using the DeepSeek vision model (deepseek-flash).
   Triggers when the user asks what a picture/screenshot/photo shows（图片/截图/照片里是什么）,
   requests OCR or text extraction from images（识别图片中的文字）, analyzes code screenshots
   or error messages shown in images（代码截图/报错截图）, reads charts, diagrams, tables,
@@ -18,7 +18,7 @@ user-invocable: true
 
 - 主模型负责理解任务、推理、最终回答；本 Skill 只是主模型的"眼睛"，**只负责图片理解 / 视觉分析**。
 - 不是通用 DeepSeek Skill：不处理纯文本任务，不回答与图片无关的问题。
-- 视觉模型一律使用 `config/vision_config.env` 中的 `VISION_MODEL`（默认 `deepseek-v4-flash-vision-exp`）。
+- 视觉模型一律使用 `config/vision_config.env` 中的 `VISION_MODEL`（默认 `deepseek-flash`，DeepSeek V4.1-Flash）。
   **不要调用其他模型来代替视觉模型，不要修改主模型配置。**
 
 ## 什么时候调用（description 已覆盖，此处重申）
